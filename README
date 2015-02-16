@@ -1,0 +1,5 @@
+This code was written in Python to analyze IFU data from the Mitchell Spectrograph.
+Better readme to come.
+Basically, run antivirus.py and the name of the folder containing a nights worth of data and it will do the rest.  (At least that's the intention.)
+This program currently requires p3d to be installed in order to work properly.
+Also, I don't think the stacking is working yet, but it's been a long time since I tried to use it.
