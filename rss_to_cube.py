@@ -153,6 +153,7 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 	input_data = pyfits.getdata(input_filename)
 	#print(input_filename)
 	data_header = pyfits.getheader(input_filename, 'DATA',1)
+	print(data_header)
 	gain = float(data_header["GAIN1"]) #probably don't need this, but it was in my IDL, so I'm bringing it over
 	cdelt = float(data_header["CDELT1"])
 	crval = float(data_header["CRVAL1"])
@@ -175,10 +176,11 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 	wave_pix[1] = wave_pix[0]+int(0.1*number_of_pixels)
 	print("Wave pix: "+str(wave_pix))
 	Nrd = np.std(input_data[sky_fibers[0]:sky_fibers[1],wave_pix[0]:wave_pix[1]])
+	print("Nrd: "+str(Nrd))
 	
 	
 	
-	if plot == 'plot_not':
+	if plot == 'plot':
 		plt.title('Sky fibers (also where Nrd is being determined)',fontsize=16)
 		fiber = range(number_of_fibers)
 		fiber_intensity = range(number_of_fibers)
@@ -199,7 +201,7 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 	#CALCULATE AND SUBTRACT THE NOISE FROM OUR SIGNAL
 	#Calculate the vertical offset, which is just background noise, and subtract that away.
 	target_skyline_window = int(40*cdelt) #based on cdelt, we pick a reasonable range  around the window to be fitting around. (~xx pixels for VIMOS HR ~80 pixels for VIMOS LR)
-	
+	print('target_skyline_window '+str(target_skyline_window))
 	#offset = linear fit to continuium
 	#corrected_image = image-offset
 	
@@ -215,11 +217,14 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 	#
 	#
 	#
+	print('target_skyline_pixels '+str(target_skyline_pixels))
 	original_peaks = np.zeros(number_of_fibers)
 	integrated_skyline_flux = np.zeros(number_of_fibers)
 	for index, spectrum in enumerate(input_data):
 		original_peak = max(spectrum) #I am assuming that the sky line is the brightest pixel in the image
+		print('original_peak '+str(original_peak))
 		original_peak_position = target_skyline_pixels
+		print('original_peak_position '+str(original_peak_position))
 		p0 = [original_peak, original_peak_position, 1.]
 		#print(original_peak_position)
 		#if index == 65:
@@ -237,7 +242,7 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 			original_peaks[index] = original_peak_position
 			peak = original_peak_position
 			sigma = cdelt #default to 4x the resolution
-		
+		print('sigma '+str(sigma))
 		p0 = [1.0, 1000]
 		#from peak-5sigma to peak-3sigme and peak+3sigma to peak+5sigma
 		if sigma > (0.1*number_of_pixels):
@@ -251,19 +256,21 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 		linear_pixels = before_peak+after_peak #np.concatenate((before_peak, after_peak), axis=0)
 		#if len(linear_pixels) <= 1:
 		#	linear_pixels = 
-		#print(linear_pixels)
-		#print(len(linear_pixels))
+		print('linear_pixels '+str(linear_pixels))
+		print('len(linear_pixels) '+str(len(linear_pixels)))
 		#coeff, linear_matrix = curve_fit(line, [0,1,2,3,4,5,6,7,8,9], [ 1100.2154541  ,1145.8223877 , 1194.49658203 , 1173.9029541 ,  1254.51281738,  1212.34179688 , 1264.14782715,  1208.92175293 , 1092.0267334  , 1016.29296875], p0=p0)
 		if len(linear_pixels) > 1:
 			#print(index)
 			#print('Length of linear pixels:' + str(len(linear_pixels)))
 			#try:
+			print('input_data[index,linear_pixels]: '+str(input_data[index,linear_pixels]))
+			print('index '+str(index))
 			coeff, linear_matrix = curve_fit(line, range(len(linear_pixels)), input_data[index,linear_pixels], p0=p0)
 			line_fit = line(range(2*target_skyline_window), *coeff)
 			#except:
 			#	coeff = [1.0, 1000]
 			#	line_fit = line(range(2*target_skyline_window), *coeff)
-			if plot == 'plot1':
+			if plot == 'plot':
 				plt.title('Skyline)',fontsize=16)
 				plt.plot(range(2*target_skyline_window),input_data[index,target_skyline_pixels-target_skyline_window:target_skyline_pixels+target_skyline_window])
 				plt.plot(range(2*target_skyline_window),line_fit)
@@ -271,9 +278,13 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 				plt.draw()
 				#time.sleep(sleep_time)
 				plt.clf()
+			print('*coeff '+str(coeff))
+			print('number_of_pixels: '+str(number_of_pixels))
 			offset = line(range(number_of_pixels), *coeff)
+			print('offset '+str(offset))
+			print('length of offset: '+str(len(offset)))
 			offset_spectrum = spectrum-offset#/2 #not sure if this 2 is required...
-			if plot == 'plot1':
+			if plot == 'plot':
 				plt.title('Skyline)',fontsize=16)
 				plt.plot(range(100), spectrum[790:890])
 				plt.plot(range(100), offset_spectrum[790:890])
@@ -296,7 +307,7 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 				print("Fit didn't work, defaulting to backup fit.")
 				coeff, gauss_matrix = curve_fit(gauss, range(number_of_pixels), spectrum, p0=p0)
 				gauss_fit = gauss(range(number_of_pixels), *coeff)
-			if plot == 'plot1':
+			if plot == 'plot':
 				plt.title('Skyline)',fontsize=16)
 				plt.plot(range(100), spectrum[790:890])
 				plt.plot(range(100), gauss_fit[790:890])
@@ -312,7 +323,7 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 	median_skyline_flux = np.median(integrated_skyline_flux)
 	#print(median_skyline_flux)
 	scale = integrated_skyline_flux/median_skyline_flux
-	if plot == 'plot1':
+	if plot == 'plot':
 		plt.title('Skyline)',fontsize=16)
 		plt.plot(range(number_of_fibers),scale)
 		plt.draw()
@@ -340,7 +351,7 @@ def sky_subtraction(input_filename,output_filename,sky_fibers_file):
 		#print(temp_storage)
 		average_sky_vector[spectrum_index] = np.mean(clipped_vector)
 	#print(average_sky_vector)
-	if plot == 'plot1':
+	if plot == 'plot':
 		plt.title('Average Skyline to be subtract',fontsize=16)
 		plt.plot(range(number_of_pixels),average_sky_vector)
 		plt.ylim(0,1000)
@@ -429,13 +440,13 @@ def virus(input_filename, output_filename):
 	pyfits.writeto(output_filename,field,input_header,clobber=True)
 	pyfits.append(output_filename, var_field, input_header)
 	pyfits.writeto(os.path.splitext(output_filename)[0]+"_fov.fits",fov_field,input_header,clobber=True)
-plot="noplotting"
-#input_filename = '/Users/jimmy/Astro/reduced/mcdonald/20150215/vp_0098_shifted.fits'
+plot="plot"
+input_filename = '/Users/jimmy/Astro/reduced/mcdonald/20150215/vp_0033_shifted.fits'
 #input_filename = '/Users/jimmy/Astro/reduced/mcdonald/20140404/vp_0065_oextr1.fits'
-#output_filename = '/Users/jimmy/Astro/reduced/mcdonald/20150215/vp_0098_subbed.fits'
+output_filename = '/Users/jimmy/Astro/reduced/mcdonald/20150215/vp_0033_subbed.fits'
 #sky_shift(input_filename, output_filename)
-#sky_fibers_file = '/Users/jimmy/Astro/reduced/mcdonald/L109092_2_fibers.txt'
-#sky_subtraction(input_filename,output_filename,sky_fibers_file)
+sky_fibers_file = '/Users/jimmy/Astro/reduced/mcdonald/HR3454_0_fibers.txt'
+sky_subtraction(input_filename,output_filename,sky_fibers_file)
 #input_filename = '/Users/jimmy/Astro/reduced/mcdonald/20150215/vp_0098_subbed.fits'
 #output_filename = '/Users/jimmy/Astro/reduced/mcdonald/20150215/vp_0098_cubefits.fits'
 #virus(input_filename, output_filename)
