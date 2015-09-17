@@ -19,7 +19,7 @@ from ds9 import *
 
 
 def stack(input_dir, target, offsets_file):
-	input_fovs = glob.glob(input_dir+target+'*_fov.fits') #used the fov files because their stacked
+	input_fovs = glob.glob(input_dir+target+'*_fov.fits') #used the fov files because they're stacked
 	input_cubes = [cube[0:-9]+'.fits' for cube in input_fovs]
 	print("Stacking the following files into one cube: ")
 	print(input_cubes)
